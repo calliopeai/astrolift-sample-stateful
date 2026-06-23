@@ -1,0 +1,45 @@
+# astrolift-sample-stateful — statefulset + PVC topology (spec 42 §4, R7).
+#
+# Renders a StatefulSet + headless Service. `storage_size` drives the
+# volumeClaimTemplate (named "<workload>-data"), so each pod gets its own
+# PersistentVolume that survives restarts. The [[workloads.volumes]] pvc
+# block declares the same claim's mount path/size/access mode per the §4
+# skeleton; its mount_path matches the image's STORE_PATH default
+# (/var/lib/store), which is where the SQLite DB is written.
+#
+# Deploy with a pre-built Docker Hub image (no platform build this
+# increment). Pin a deterministic main-<sha7> tag for real deploys.
+name = "sample-stateful"
+
+[[workloads]]
+name = "store"
+kind = "statefulset"
+replicas = 1
+storage_class = ""
+storage_size = "1Gi"
+cpu_request = "50m"
+cpu_limit = "250m"
+memory_request = "64Mi"
+memory_limit = "128Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-stateful:latest"
+  port = 8080
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+    STORE_PATH = "/var/lib/store/data.db"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080
+
+  [[workloads.volumes]]
+  name = "data"
+  kind = "pvc"
+  mount_path = "/var/lib/store"
+  size = "1Gi"
+  access_mode = "ReadWriteOnce"
